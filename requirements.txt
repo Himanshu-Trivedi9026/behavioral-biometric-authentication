@@ -1,0 +1,48 @@
+# =============================================================================
+# Behavioral Biometric Authentication — Requirements
+# =============================================================================
+# Organized by phase. Install ONLY what the current phase needs.
+#
+# Phase 1 (current) — Project Setup: minimal footprint.
+#   .venv/bin/pip install -r requirements.txt
+#
+# Later phases add their own sections; keep installs explicit and incremental.
+# =============================================================================
+
+# --- Phase 1: Project foundation ------------------------------------------
+# No third-party runtime packages are required for Phase 1.
+# The list below is intentionally near-empty to keep the setup verifiable and clean.
+# (pytest is listed so the basic test scaffolding can run in later phases.)
+
+pytest>=8.0.0
+
+# ---------------------------------------------------------------------------
+# LATER PHASES (do not install during Phase 1):
+# ---------------------------------------------------------------------------
+
+# --- Phase 2/3: Browser data capture & processing ---
+# Phase 3 uses only the Python standard library (no new runtime dependencies).
+# Uncomment the packages below if a future phase needs them.
+# numpy>=1.26.0
+# pandas>=2.2.0
+
+# --- Phase 5: Neural behavioral encoder (CNN + GRU) ---
+# torch>=2.14.0
+# numpy>=2.0.0
+# NOTE: install the CPU build to keep the footprint small and avoid pulling
+# the multi-GB CUDA toolchain:
+#   .venv/bin/pip install --index-url https://download.pytorch.org/whl/cpu torch numpy
+# scikit-learn>=1.4.0
+
+# --- Phase 6: Backend / API / DB ---
+# fastapi>=0.110.0
+# uvicorn[standard]>=0.29.0
+# sqlalchemy>=2.0.0
+# psycopg2-binary>=2.9.9
+# PyJWT>=2.8.0
+# redis>=5.0.0
+
+# --- Phase 8: Testing / Deployment ---
+# pytest-asyncio>=0.23.0
+# httpx>=0.27.0
+# docker-compose (provided by Docker tooling, not pip)

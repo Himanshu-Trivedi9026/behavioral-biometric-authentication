@@ -1,0 +1,132 @@
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+wheelhouse/
+eggs/
+*.whl
+
+# Unit test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Type checking
+.mypy_cache/
+.pytype/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# Jupyter notebooks (checkpoints only; keep notebooks themselves)
+.ipynb_checkpoints/
+
+# ---------------------------------------------------------------------------
+# Virtual environments
+# ---------------------------------------------------------------------------
+.venv/
+venv/
+ENV/
+env/
+virtualenv/
+
+# ---------------------------------------------------------------------------
+# VS Code
+# ---------------------------------------------------------------------------
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# ---------------------------------------------------------------------------
+# Node / frontend development
+# ---------------------------------------------------------------------------
+node_modules/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+dist/
+coverage/
+.vite/
+.eslintcache
+.netlify
+
+# ---------------------------------------------------------------------------
+# Datasets
+# ---------------------------------------------------------------------------
+# Raw/collected data must never be committed (privacy + size).
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+# Keep the top-level datasets dir but ignore what goes inside it (large archives).
+data/datasets/*
+!data/datasets/.gitkeep
+
+# ---------------------------------------------------------------------------
+# Machine learning model files
+# ---------------------------------------------------------------------------
+*.pkl
+*.pickle
+*.pt
+*.pth
+*.onnx
+*.h5
+*.hdf5
+*.joblib
+*.safetensors
+models/*/
+!models/.gitkeep
+*.tflite
+
+# ---------------------------------------------------------------------------
+# Environment / configuration secrets
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.local
+*_config.env
+config/local*.json
+credential*.json
+
+# ---------------------------------------------------------------------------
+# OS-generated files
+# ---------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+*.swp
+*~
+*#
+
+# ---------------------------------------------------------------------------
+# Logs & temporary files
+# ---------------------------------------------------------------------------
+*.log
+logs/
+tmp/
+temp/
+*.tmp
