@@ -97,6 +97,12 @@ models/*/
 *.tflite
 
 # ---------------------------------------------------------------------------
+# Generated inference artifacts (Phase 9B, runtime-generated)
+# ---------------------------------------------------------------------------
+models/behavioral_preprocessing.json
+models/verification_config.json
+
+# ---------------------------------------------------------------------------
 # Environment / configuration secrets
 # ---------------------------------------------------------------------------
 .env

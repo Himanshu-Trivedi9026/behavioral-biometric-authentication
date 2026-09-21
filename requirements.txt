@@ -3,46 +3,42 @@
 # =============================================================================
 # Organized by phase. Install ONLY what the current phase needs.
 #
-# Phase 1 (current) — Project Setup: minimal footprint.
 #   .venv/bin/pip install -r requirements.txt
 #
-# Later phases add their own sections; keep installs explicit and incremental.
+# Phases add their own sections; keep installs explicit and incremental.
 # =============================================================================
 
 # --- Phase 1: Project foundation ------------------------------------------
-# No third-party runtime packages are required for Phase 1.
-# The list below is intentionally near-empty to keep the setup verifiable and clean.
-# (pytest is listed so the basic test scaffolding can run in later phases.)
-
 pytest>=8.0.0
 
-# ---------------------------------------------------------------------------
-# LATER PHASES (do not install during Phase 1):
-# ---------------------------------------------------------------------------
-
-# --- Phase 2/3: Browser data capture & processing ---
-# Phase 3 uses only the Python standard library (no new runtime dependencies).
-# Uncomment the packages below if a future phase needs them.
-# numpy>=1.26.0
-# pandas>=2.2.0
-
-# --- Phase 5: Neural behavioral encoder (CNN + GRU) ---
-# torch>=2.14.0
-# numpy>=2.0.0
-# NOTE: install the CPU build to keep the footprint small and avoid pulling
-# the multi-GB CUDA toolchain:
+# --- Phase 5: Neural behavioral encoder (CNN + GRU) ------------------------
+# CPU build to keep the footprint small and avoid the multi-GB CUDA toolchain:
 #   .venv/bin/pip install --index-url https://download.pytorch.org/whl/cpu torch numpy
-# scikit-learn>=1.4.0
+torch>=2.14.0
+numpy>=2.0.0
 
-# --- Phase 6: Backend / API / DB ---
-# fastapi>=0.110.0
-# uvicorn[standard]>=0.29.0
-# sqlalchemy>=2.0.0
-# psycopg2-binary>=2.9.9
-# PyJWT>=2.8.0
+# --- Phase 9A: FastAPI backend foundation ---------------------------------
+fastapi>=0.110.0
+uvicorn>=0.29.0
+httpx>=0.27.0          # required by fastapi.testclient.TestClient
+
+# --- Phase 10: PostgreSQL profile storage ---------------------------------
+# psycopg 3 (native libpq via [binary] wheels for Python 3.14) + its pooled
+# connection helper. Migrations are plain SQL files under db/migrations/.
+psycopg[binary]>=3.2.0
+psycopg-pool>=3.2.0
+
+# --- Phase 11: Authentication & authorization ------------------------------
+# JWT bearer tokens (HS256) via PyJWT, and Argon2id password hashing via
+# argon2-cffi. Install together with Phase 9A: FastAPI + Pydantic models.
+PyJWT>=2.8.0
+argon2-cffi>=23.1.0
+
+# ---------------------------------------------------------------------------
+# FUTURE PHASES (not installed):
+# ---------------------------------------------------------------------------
+# --- Redis / sessions etc. (later phases) ---
 # redis>=5.0.0
-
-# --- Phase 8: Testing / Deployment ---
+# --- Async tests (future) ---
 # pytest-asyncio>=0.23.0
-# httpx>=0.27.0
 # docker-compose (provided by Docker tooling, not pip)

@@ -26,13 +26,21 @@ export function useCollector() {
   const [keyboardCount, setKeyboardCount] = useState(0);
   const [mouseCount, setMouseCount] = useState(0);
   const [lastEvent, setLastEvent] = useState("ready — press Start Collection");
+  const [session, setSession] = useState(null);
 
   const refreshFromSession = useCallback(() => {
     const c = sessionRef.current;
     const sess = c.getSession();
-    setSessionId(sess ? sess.session_id : null);
-    setKeyboardCount(c.keyboardEventCount());
-    setMouseCount(c.mouseEventCount());
+    setSession(sess);
+    if (sess) {
+      setSessionId(sess.session_id);
+      setKeyboardCount(sess.keyboard_events.length);
+      setMouseCount(sess.mouse_events.length);
+    } else {
+      setSessionId(null);
+      setKeyboardCount(0);
+      setMouseCount(0);
+    }
   }, []);
 
   const record = useCallback(() => {
@@ -87,6 +95,7 @@ export function useCollector() {
     setSessionId(null);
     setKeyboardCount(0);
     setMouseCount(0);
+    setSession(null);
     setLastEvent("ready — press Start Collection");
     return true;
   }, []);
@@ -155,6 +164,7 @@ export function useCollector() {
     keyboardCount,
     mouseCount,
     lastEvent,
+    session,
     start,
     stop,
     download,

@@ -1,57 +1,71 @@
-import { useCollector } from "./hooks/useCollector.js";
-import StatusCard from "./components/StatusCard.jsx";
-import Controls from "./components/Controls.jsx";
-import TypeZone from "./components/TypeZone.jsx";
-import PrivacyNotice from "./components/PrivacyNotice.jsx";
+import { useEffect } from "react";
+import { useLocation, navigate } from "./router.jsx";
+import { useAuth } from "./auth.js";
+import LandingPage from "./landing/LandingPage.jsx";
+import RegistrationPage from "./registration/RegistrationPage.jsx";
+import LoginPage from "./login/LoginPage.jsx";
+import CollectorPage from "./pages/CollectorPage.jsx";
+import EnrollmentPage from "./enrollment/EnrollmentPage.jsx";
+import VerificationPage from "./verification/VerificationPage.jsx";
+import ContinuousVerificationPage from "./continuous/ContinuousVerificationPage.jsx";
+
+const PROTECTED_ROUTES = {
+  enrollment: true,
+  verification: true,
+  continuous: true,
+};
 
 export default function App() {
-  const {
-    status,
-    statusLabel,
-    sessionId,
-    keyboardCount,
-    mouseCount,
-    lastEvent,
-    start,
-    stop,
-    download,
-    clear,
-  } = useCollector();
+  const { pathname, route } = useLocation();
+  const session = useAuth();
 
-  return (
-    <div className="container">
-      <header className="app-header">
-        <h1>Behavioral Biometric Authentication</h1>
-        <p className="subtitle">
-          Phase 2 — Browser-based Keyboard &amp; Mouse Data Collector{" "}
-          <span className="badge">DEV / TEST ONLY</span>
-        </p>
-      </header>
+  useEffect(() => {
+    if (route === null && pathname !== "/") {
+      history.replaceState({}, "", "/");
+    }
+  }, [pathname, route]);
 
-      <StatusCard
-        status={status}
-        statusLabel={statusLabel}
-        sessionId={sessionId}
-        keyboardCount={keyboardCount}
-        mouseCount={mouseCount}
-        lastEvent={lastEvent}
-      />
+  const requiresAuth = PROTECTED_ROUTES[route] === true;
 
-      <Controls
-        status={status}
-        onStart={start}
-        onStop={stop}
-        onDownload={download}
-        onClear={clear}
-      />
+  useEffect(() => {
+    if (requiresAuth && !session) {
+      navigate("/login");
+    }
+  }, [requiresAuth, session]);
 
-      <TypeZone running={status === "running"} />
+  useEffect(() => {
+    if (route === "login" && session) {
+      navigate("/enrollment");
+    }
+  }, [route, session]);
 
-      <PrivacyNotice />
+  if (requiresAuth && !session) {
+    return null;
+  }
 
-      <footer className="footer">
-        <p>College project — development interface, not for production use.</p>
-      </footer>
-    </div>
-  );
+  if (route === "registration") {
+    return <RegistrationPage />;
+  }
+
+  if (route === "login") {
+    return <LoginPage />;
+  }
+
+  if (route === "collector") {
+    return <CollectorPage />;
+  }
+
+  if (route === "enrollment") {
+    return <EnrollmentPage />;
+  }
+
+  if (route === "verification") {
+    return <VerificationPage />;
+  }
+
+  if (route === "continuous") {
+    return <ContinuousVerificationPage />;
+  }
+
+  return <LandingPage />;
 }
