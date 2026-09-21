@@ -1,0 +1,17 @@
+# Phase 15A — frontend build-context exclusions (context: ./frontend).
+
+# Dependencies installed by npm ci inside the image; no need to send them.
+node_modules
+
+# Build output regenerated inside the image by `npm run build`.
+dist
+
+# Root-level env / secrets — never baked into the image.
+.env
+.env.*
+!.env.example
+
+# Editor / OS / log files.
+.DS_Store
+*.swp
+*.log

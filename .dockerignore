@@ -1,0 +1,49 @@
+# Phase 15A — root build-context exclusions.
+#
+# The backend image uses the repository root as its build context, so this
+# file keeps that context small and free of secrets / generated data.
+# The frontend image uses ./frontend as its context and has its own
+# frontend/.dockerignore.
+
+# Version control
+.git
+.gitignore
+
+# Local Python environment & caches
+.venv
+venv
+__pycache__/
+*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+*.egg-info
+build/
+dist-packages/
+
+# Local environment / secrets — never baked into an image
+.env
+.env.*
+!.env.example
+
+# Generated datasets / data not required at runtime
+data/
+
+# ML artifacts: runtime-mounted read-only, never baked into images
+models/**/*.pt
+models/
+*.pt
+*.pth
+*.onnx
+*.pkl
+
+# Frontend build outputs and deps (frontend builds from its own context)
+frontend/node_modules
+frontend/dist
+
+# Editor / OS files
+.DS_Store
+*.swp
+.idea
+.vscode
+*.log

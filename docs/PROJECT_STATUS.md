@@ -2,7 +2,7 @@
 
 ## Current Phase
 
-**Phase 14B — Server-Authoritative Session Verification State & Re-Verification Gating (Implemented; automated checks PASSED)**
+**Phase 15A — Containerization Foundation (Implemented; full-stack Compose deployment exercised)**
 
 Status: automated implementation checks all pass; manual browser E2E pending
 (no browser available in this environment — see Phase 14B section).
@@ -485,10 +485,52 @@ Complete
   session's state (intended per-login isolation — the same user can log in
   again freely and starts clean); development system — synthetic-dev
   artifacts, no production claims
-- **Phase 15 not started:** rate limiting, auto-logout/locking on repeated
-  suspicion, refresh/revocation, Redis/WebSockets, multi-device sessions,
-  deployment, retraining, or any JWT/model change
+- **Phase 15 not started (as of Phase 14B):** rate limiting, auto-logout/locking
+  on repeated suspicion, refresh/revocation, Redis/WebSockets, multi-device
+  sessions, deployment, retraining, or any JWT/model change
 - See [`PHASE_14B_SESSION_STATE.md`](PHASE_14B_SESSION_STATE.md) for full details
+
+## Phase 15A — Implemented (full-stack Compose deployment PASSED)
+
+- Containerized the Phase 1–14B application **without behavior changes**:
+  PostgreSQL `postgres:16-alpine`, FastAPI backend (CPU PyTorch), React/Vite
+  frontend served by nginx with SPA deep-link fallback
+- **Dockerfile (backend):** `python:3.14-slim`, CPU-only PyTorch pinned
+  (`torch==2.14.0+cpu` from the PyTorch CPU index, libgomp1), requirements
+  installed reproducibly, non-root user, `uvicorn backend.app.main:app` on
+  0.0.0.0:8000; `.env` and model binaries never baked in
+- **Dockerfile (frontend):** multi-stage `node:22-alpine` build -> `nginx`
+  serve; `VITE_API_BASE_URL` injected as a build arg from
+  `compose.yaml`/`.env`; deep links `/login`, `/enrollment`, `/verification`,
+  `/continuous`, `/register`, `/collector` all return the SPA (HTTP 200)
+- **`compose.yaml`:** services `db -> migrate -> backend -> frontend`, named
+  volume `postgres_data`, ports 8000 (backend) / 3000 (frontend), host-mapped
+  via `.env`; PostgreSQL never published to the host; healthchecks wired into
+  `depends_on` (`service_healthy`, `service_completed_successfully`); no host
+  networking
+- **Deterministic migrations:** one-shot `migrate` service runs
+  `db/migrations/*.sql` in lexical order (001 → 002 → 003) via
+  `psql -v ON_ERROR_STOP=1` after `pg_isready`; backend only starts after
+  migrate completes successfully; migration SQL untouched; no tracking table
+- **Model artifacts:** `models/*.pt` + JSON artifacts remain gitignored, never
+  committed, mounted read-only at `/app/models` with explicit `BBA_*` paths;
+  missing artifacts fail closed (503) — no generation/retraining/recalibration
+- **Secrets/env:** `BBA_ENVIRONMENT` pinned to `production`; `BBA_JWT_SECRET_KEY`
+  and `POSTGRES_PASSWORD` required by Compose (fail closed) and by the backend
+  config validation; `.env` gitignored; `.env.example` placeholders only
+- **Full-stack smoke (real containers):** register → login → enroll → verify →
+  continuous-verify → session-state all PASSED with the existing threshold
+  (0.4635127782821655); Phase 14B gating exercised (SUSPICIOUS → 403
+  `reverification_required` → VERIFIED window clears); rows persisted in
+  PostgreSQL (`users`, `behavioral_profiles`, `behavioral_session_states`)
+- **Persistence/restart:** backend restart while DB persisted → data intact,
+  app works; `docker compose down` + `up` (no `-v`) → data survives; `down -v`
+  → volume reset and fresh migration verified
+- **Host test batteries unchanged:** backend pytest 784 passed / 60 PG-gated
+  skipped; frontend 75/75; `npm run build` PASS; `compileall` PASS;
+  `git diff --check` clean; no secrets or model binaries in Git
+- See [`PHASE_15A_CONTAINERIZATION.md`](PHASE_15A_CONTAINERIZATION.md) for
+  architecture, services, ports, migration and reset instructions
 
 ## Roadmap Status
 
@@ -503,16 +545,21 @@ Completed phases:
 - Phase 13: Completed
 - Phase 14A: Implemented (automated checks PASSED; manual browser E2E pending)
 - Phase 14B: Implemented (automated checks PASSED; manual browser E2E pending)
+- Phase 15A: Implemented (full-stack Compose deployment PASSED)
 
-Phase 15 and later have **not** started: refresh tokens, auto-logout/locking
-on repeated suspicion, rate limiting, Redis/WebSockets, multi-device sessions,
-deployment, retraining, or new ML. The full real-typing browser E2E for the
+Phase 15B and later have **not** started: TLS/HTTPS + public reverse proxy,
+Kubernetes / cloud / CI-CD, load balancing, autoscaling, refresh tokens,
+auto-logout/locking on repeated suspicion, rate limiting, Redis/WebSockets,
+multi-device sessions, deployment hardening, retraining, or new ML. The full
+real-typing browser E2E for the
 Phase 12 flow and the Phase 14A `/continuous` / Phase 14B `/continuous` +
 gated-enrollment flows remains unverified without a manual browser pass (no
 automated browser was available). Real-PostgreSQL verification of the Phase
 10/11/14B repositories is complete (users + behavioural profiles + per-session
 behavioural verification state survive backend restarts; the 14B state also
 survived a live server restart).
+Additionally, Phase 15A verified state persistence and Phase 14B gating against
+the real PostgreSQL container inside the Compose stack.
 
 ## Development Rule
 
