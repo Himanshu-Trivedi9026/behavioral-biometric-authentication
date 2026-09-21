@@ -114,6 +114,18 @@ config/local*.json
 credential*.json
 
 # ---------------------------------------------------------------------------
+# TLS certificates / private keys (Phase 15B — development certs & any
+# operator-mounted real keys). Never committed, never baked into images.
+# ---------------------------------------------------------------------------
+proxy/certs/*
+!proxy/certs/.gitkeep
+*.crt
+*.key
+*.pem
+*.srl
+*.csr
+
+# ---------------------------------------------------------------------------
 # OS-generated files
 # ---------------------------------------------------------------------------
 .DS_Store

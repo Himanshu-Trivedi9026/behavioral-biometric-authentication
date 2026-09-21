@@ -2,10 +2,12 @@
 
 ## Current Phase
 
-**Phase 15A — Containerization Foundation (Implemented; full-stack Compose deployment exercised)**
+**Phase 15B — TLS Reverse Proxy + DB-aware Readiness + Structured Request Logging (Implemented; automated checks PASSED; manual browser E2E pending)**
 
-Status: automated implementation checks all pass; manual browser E2E pending
-(no browser available in this environment — see Phase 14B section).
+Status: automated implementation, containerized test suites, deployment
+verification matrix, and secret/privacy audit all pass; the interactive
+Chrome E2E over HTTPS is prepared and pending the user's manual pass
+(see the Phase 15B section below).
 
 ## Status
 
@@ -532,6 +534,72 @@ Complete
 - See [`PHASE_15A_CONTAINERIZATION.md`](PHASE_15A_CONTAINERIZATION.md) for
   architecture, services, ports, migration and reset instructions
 
+## Phase 15B — Implemented (automated checks PASSED; manual browser E2E pending)
+
+- **Single public edge — TLS reverse proxy (`proxy/`, nginx:1.27-alpine):**
+  the ONLY service with host-published ports. TLS 1.2/1.3 only (TLS 1.0/1.1
+  rejected), HSTS `max-age=63072000; includeSubDomains` + `nosniff` headers,
+  HTTP :80 → HTTPS :301 redirect, `http2 on`. Routes `/api/`, `/health`,
+  `/health/ready`, `/docs`, `/openapi.json`, `/redoc` → backend (internal
+  `:8000`); everything else → frontend SPA (internal `:80`, deep links intact).
+  Unknown `/api/...` returns the backend's structured 404 JSON — never the SPA
+  fallback. Backend and frontend publish no host ports anymore; PostgreSQL
+  stays private. `X-Request-Id` is accepted/echoed end-to-end.
+- **Development TLS certificates (`scripts/generate_dev_certs.sh`):** openssl
+  only, idempotent, local CA + server certificate (SAN `DNS:localhost`,
+  `IP:127.0.0.1` + optional `BBA_TLS_HOST_NAMES`) under `proxy/certs/`,
+  gitignored, mounted read-only into the proxy (`BBA_TLS_CERT_PATH` /
+  `BBA_TLS_KEY_PATH` overridable for operator-provided trusted certs). No
+  ACME/Let's Encrypt; keys never in image layers.
+- **DB-aware readiness (`GET /health/ready` + `GET /api/v1/health/ready`):**
+  `{status, database: "ok"|"not_configured"|"unavailable", ml}` — 200 when the
+  configured PostgreSQL answers `SELECT 1` (or is `not_configured`), 503
+  structured `database_unavailable` when configured but unreachable. `/health`
+  stays the unchanged zero-I/O liveness probe. Backend container healthcheck
+  switched to `/health/ready`, so a DB outage now flags the backend unhealthy
+  (fail closed) and readiness recovers automatically when the DB returns.
+- **Structured request logging (stdlib only, no new deps):**
+  `backend/app/observability.py` — JSONL access log
+  (timestamp/level/logger/message/request_id/method/path/status/duration_ms),
+  `RequestIdMiddleware` accepting a safe `X-Request-Id`
+  (`^[A-Za-z0-9._:*+-]{1,128}$`) else a hex id, echoed as a response header.
+  **Privacy:** only whitelisted fields; request body, query string, passwords,
+  `Authorization`, JWT payloads and raw behavioural events are never logged.
+  JSON format active whenever `BBA_ENVIRONMENT != development`; `BBA_LOG_LEVEL`
+  env supported (validated).
+- **Same-origin frontend:** `VITE_API_BASE_URL=/api/v1` (relative) baked into
+  the bundle; production bundle verified to contain no `http://localhost:8000`
+  or `:3000`; `BBA_CORS_ORIGINS=https://localhost`. Local Vite dev flow
+  unchanged (falls back to `http://localhost:8000/api/v1`).
+- **Verification matrix (all PASSED against the running stack):**
+  HTTP→HTTPS 301; all HTTPS routes `/`, `/login`, `/register`, `/enrollment`,
+  `/verification`, `/continuous`, `/docs`, `/openapi.json`, `/redoc`,
+  `/api/v1/health`, `/health`, `/health/ready` → 200 with CA validation;
+  readiness 200 (DB up) → 503 `database_unavailable` (DB stopped, `/health`
+  still 200) → 200 (DB restarted); unknown `/api/v1/...` → 404 JSON; HSTS +
+  nosniff present; TLS 1.2 + 1.3 accepted, TLS 1.1/1.0 rejected; bundle scan
+  clean; backend/frontend/db ports unpublished; certs gitignored; secret scan
+  of all five service logs → zero hits.
+- **Test suites (Phase 15A baselines preserved, +33 backend tests):**
+  backend host pytest **815 passed / 62 skipped**; backend containerized
+  **815 / 62** (no PG) and **877 passed** (`TEST_DATABASE_URL` against the
+  compose `behavioral_test` DB); **+28 readiness** (`test_health_readiness.py`)
+  and **+5 observability/logging** (`test_observability_logging.py`) tests, all
+  green; frontend containerized **75/75**; `npm run build` PASS; `compileall`
+  PASS; `git diff --check` clean; no secrets/model binaries in Git; no
+  commit created (working tree only, per Phase 15B approval).
+- **Honest guard-rails:** the certificates are DEVELOPMENT-ONLY (browser
+  warning applies); no ACME/trusted-cert automation — a production deployment
+  must mount a trusted certificate and review HSTS `includeSubDomains`; the
+  readiness 503 makes the backend container's healthcheck flip during a DB
+  outage (intended, fail closed) — restart/recovery is automatic; the full
+  interactive Chrome E2E over HTTPS (register → login → enroll → verify →
+  continuous → suspicious → re-verify → logout) is **not yet run as a manual
+  browser pass** and is therefore NOT claimed PASSED until the user performs it.
+- See [`PHASE_15B_TLS_REVERSE_PROXY.md`](PHASE_15B_TLS_REVERSE_PROXY.md) for
+  architecture, certificates, readiness/logging details, the deployment
+  verification matrix, and the manual E2E checklist
+
 ## Roadmap Status
 
 Completed phases:
@@ -546,16 +614,18 @@ Completed phases:
 - Phase 14A: Implemented (automated checks PASSED; manual browser E2E pending)
 - Phase 14B: Implemented (automated checks PASSED; manual browser E2E pending)
 - Phase 15A: Implemented (full-stack Compose deployment PASSED)
+- Phase 15B: Implemented (automated checks PASSED; manual browser E2E pending)
 
-Phase 15B and later have **not** started: TLS/HTTPS + public reverse proxy,
-Kubernetes / cloud / CI-CD, load balancing, autoscaling, refresh tokens,
-auto-logout/locking on repeated suspicion, rate limiting, Redis/WebSockets,
-multi-device sessions, deployment hardening, retraining, or new ML. The full
+Phase 16 and later have **not** started: TLS/HTTPS for real deployments via
+ACME/trusted certificates, Kubernetes / cloud / CI-CD, load balancing,
+autoscaling, refresh tokens, auto-logout/locking on repeated suspicion, rate
+limiting, Redis/WebSockets, multi-device sessions, deployment hardening,
+retraining, or new ML. The full
 real-typing browser E2E for the
 Phase 12 flow and the Phase 14A `/continuous` / Phase 14B `/continuous` +
-gated-enrollment flows remains unverified without a manual browser pass (no
-automated browser was available). Real-PostgreSQL verification of the Phase
-10/11/14B repositories is complete (users + behavioural profiles + per-session
+gated-enrollment flows remains unverified without a manual browser pass over
+HTTPS (no automated browser was available). Real-PostgreSQL verification of the
+Phase 10/11/14B repositories is complete (users + behavioural profiles + per-session
 behavioural verification state survive backend restarts; the 14B state also
 survived a live server restart).
 Additionally, Phase 15A verified state persistence and Phase 14B gating against

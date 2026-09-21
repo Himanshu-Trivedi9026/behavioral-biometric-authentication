@@ -30,6 +30,10 @@ Supported environment variables
 ``BBA_JWT_ALGORITHM``             JWT signing algorithm (Phase 11; ``HS256``).
 ``BBA_JWT_ACCESS_TOKEN_EXPIRE_MINUTES``  access-token lifetime in minutes
                                   (Phase 11; default ``30``).
+``BBA_LOG_LEVEL``                root log level (Phase 15B; one of
+                                  ``DEBUG``/``INFO``/``WARNING``/``ERROR``/
+                                  ``CRITICAL``; default ``INFO``). Invalid
+                                  values are rejected at construction.
 
 All fields are optional; the defaults are appropriate for local development.
 
@@ -55,8 +59,12 @@ DEFAULT_PREPROCESSING_ARTIFACT_PATH = "models/behavioral_preprocessing.json"
 DEFAULT_VERIFICATION_CONFIG_PATH = "models/verification_config.json"
 DEFAULT_JWT_ALGORITHM = "HS256"
 DEFAULT_JWT_ACCESS_TOKEN_EXPIRE_MINUTES = 30
+DEFAULT_LOG_LEVEL = "INFO"
 
 _VALID_ENVIRONMENTS = frozenset({"development", "test", "production"})
+_VALID_LOG_LEVELS = frozenset(
+    {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NOTSET"}
+)
 _TRUE_LIKE = frozenset({"true", "1", "yes"})
 _DATABASE_SCHEMES = ("postgres://", "postgresql://")
 # Only HMAC-SHA256 is supported: a single, well-understood signing algorithm
@@ -117,6 +125,7 @@ class Settings:
     jwt_secret_key: str = ""
     jwt_algorithm: str = DEFAULT_JWT_ALGORITHM
     jwt_access_token_expire_minutes: int = DEFAULT_JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+    log_level: str = DEFAULT_LOG_LEVEL
 
     # -- validation ----------------------------------------------------------
 
@@ -171,6 +180,15 @@ class Settings:
                 "jwt_secret_key is too weak or a known placeholder; use a random "
                 "secret of at least {} characters".format(_MIN_JWT_SECRET_LENGTH)
             )
+        if not isinstance(self.log_level, str):
+            raise ValueError("Settings.log_level must be a string")
+        normalized_log_level = self.log_level.strip().upper()
+        if normalized_log_level not in _VALID_LOG_LEVELS:
+            raise ValueError(
+                "log_level must be one of {}; got {!r}".format(
+                    sorted(_VALID_LOG_LEVELS), self.log_level
+                )
+            )
         if self.environment == "production" and not self.jwt_secret_key:
             raise ValueError(
                 "a production deployment must configure BBA_JWT_SECRET_KEY "
@@ -222,6 +240,8 @@ class Settings:
                     str(fields["jwt_access_token_expire_minutes"].default),
                 )
             ),
+            log_level=os.environ.get("BBA_LOG_LEVEL", "").strip().upper()
+            or fields["log_level"].default,
         )
 
     # -- privacy -------------------------------------------------------------

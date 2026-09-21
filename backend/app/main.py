@@ -30,6 +30,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.config import Settings
 from backend.app.errors import install_exception_handlers
+from backend.app.observability import RequestIdMiddleware, configure_logging
 from backend.app.routes import auth, health, root, verification
 
 logger = logging.getLogger("backend.app.main")
@@ -75,6 +76,11 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     """
     settings = settings if isinstance(settings, Settings) else Settings.from_env()
 
+    # Phase 15B: structured logging is configured for every environment (JSON
+    # in production/test, the familiar human format in development), replacing
+    # the development-only ``logging.basicConfig`` path. Idempotent.
+    configure_logging(settings.log_level, json_format=settings.environment != "development")
+
     app = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
@@ -86,12 +92,6 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     )
     app.state.settings = settings
 
-    if settings.environment == "development":
-        logging.basicConfig(
-            level=logging.DEBUG if settings.debug else logging.INFO,
-            format="%(asctime)s %(levelname)s %(name)s %(message)s",
-        )
-
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),
@@ -99,6 +99,10 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Phase 15B: request correlation + structured access logs (no bodies,
+    # no headers, no query strings).
+    app.add_middleware(RequestIdMiddleware)
 
     install_exception_handlers(app)
 
