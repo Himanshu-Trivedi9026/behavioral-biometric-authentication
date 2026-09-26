@@ -18,7 +18,7 @@ session belongs to the enrolled user (Verified) or a different actor (Suspicious
 
 ---
 
-## Planned Technology Stack
+## Technology Stack
 
 | Layer            | Technology                              |
 |------------------|------------------------------------------|
@@ -29,16 +29,17 @@ session belongs to the enrolled user (Verified) or a different actor (Suspicious
 | Sequence Encoder | 1D-CNN (optional) + GRU                  |
 | Verification     | Siamese Network + Contrastive Loss       |
 | Database         | PostgreSQL                               |
-| Session Auth     | JWT                                      |
-| Caching          | Redis (later if required)                |
-| Deployment       | Docker (later)                           |
+| Session Auth     | JWT (HS256) + Argon2id                   |
+| TLS / Proxy      | Nginx reverse proxy (Phase 15B)          |
+| Deployment       | Docker + Docker Compose (Phase 15A)      |
 
 ---
 
-## High-Level Architecture (Planned Pipeline)
+## High-Level Architecture
 
-The pipeline below is **documentation only** — its components are implemented in later
-phases, not in this setup phase.
+The pipeline below is **implemented and running** (Phases 1–15B). Component
+documentation lives in the per-phase files linked under
+[Development Phases](#development-phases).
 
 ```
 Keyboard + Mouse Events
@@ -60,34 +61,33 @@ Threshold
 Verified / Suspicious
 ```
 
+At runtime this pipeline is served by the FastAPI backend in Docker, reached
+only through the Nginx HTTPS reverse proxy.
+
 ---
 
 ## Development Phases
 
-1. **Phase 1 — Project Setup** (`completed`)
-2. **Phase 2 — Browser-based Keyboard and Mouse Data Capture** (`completed`)
-3. **Phase 3 — Data Processing and Feature Extraction** (`completed`)
-4. **Phase 4 — Dataset Creation + Statistical (Non-Neural) Baseline** (`current`)
-5. **Phase 5 — ML Model: Sequence Encoder (1D-CNN + GRU)**
-6. **Phase 6 — ML Model: Siamese Network + Contrastive Loss (Few-Shot Verification)**
-7. **Phase 7 — Backend API (FastAPI), Database (PostgreSQL), Auth (JWT), Redis**
-8. **Phase 8 — Frontend Integration**
-9. **Phase 9 — Testing, Deployment (Docker) and Documentation**
+Phases 1–15B are **complete**. Phase 16A is **in progress**.
 
----
+1. **Phase 1** — Project Setup (`completed`)
+2. **Phase 2** — Browser-based Keyboard and Mouse Data Capture (`completed`)
+3. **Phase 3** — Data Processing and Feature Extraction (`completed`)
+4. **Phase 4** — Dataset Creation + Statistical (Non-Neural) Baseline (`completed`)
+5. **Phase 5** — ML Model: Sequence Encoder (1D-CNN + GRU) (`completed`)
+6. **Phase 6** — ML Model: Siamese Network + Contrastive Loss (`completed`)
+7. **Phase 7** — Siamese Training + Calibrated Threshold (`completed`)
+8. **Phase 8** — Enrollment / Verification Evaluation (`completed`)
+9. **Phase 9** — FastAPI Foundation + ML Service API (`completed`)
+10. **Phase 10** — PostgreSQL Profile Storage (`completed`)
+11. **Phase 11** — Authentication & Authorization (`completed`)
+12. **Phase 12** — Frontend Integration (`completed`)
+13. **Phase 13** — Live PostgreSQL Persistence (`completed`)
+14. **Phase 14** — Continuous Verification + Session State (`completed`)
+15. **Phase 15** — Containerization (15A) + TLS Reverse Proxy (15B) (`completed`)
+16. **Phase 16A** — Real-World Data Collection & Evaluation (`in progress`)
 
-## Development Rule
-
-**Each phase must be implemented, tested, reviewed, and verified before proceeding to the
-next phase.**
-
-- Implement only the scope defined for the current phase.
-- Add tests and run automated checks for everything added.
-- Review code quality, security, and correctness before moving on.
-- Verify the environment and structure before declaring a phase complete.
-- No phase is considered "done" until its stated deliverables are checked and confirmed.
-
-Detailed phase-by-phase progress is tracked in [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md).
+Per-phase documentation: [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md).
 
 ---
 
@@ -267,3 +267,239 @@ the reference point the Phase 5 encoder must beat.
 - **Next phase:** Phase 5 — CNN + GRU Behavioral Encoder
 
 See [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) for detailed phase tracking.
+---
+
+## TEAM MEMBER SETUP
+
+This section describes how to clone the repository and run a locally identical, research-approved instance for Phase 16A behavioral data collection.
+
+### Prerequisites
+
+- **Git** (version control)
+- **Docker Desktop** (Windows/macOS/Linux) with the Docker Engine running
+- **WSL2 on Windows** if required by Docker Desktop
+- A modern **web browser** (Chrome/Edge/Firefox) with permission to trust local certificates
+
+### 1. Clone repository
+
+```bash
+git clone <repository-url>
+```
+
+### 2. Enter repository
+
+```bash
+cd behavioral-biometric-authentication
+```
+
+### 3. Create .env from .env.example
+
+Copy the template to your local environment file (git-ignored, never committed):
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and set real values for secrets as instructed in the file comments. The stack uses fail-closed validation: Compose will refuse to start if required secrets (e.g., `BBA_JWT_SECRET_KEY`, `POSTGRES_PASSWORD`) are missing or placeholder in a way that violates production validation.
+
+> Note: `.env.example` ships with placeholders only and contains no real credentials.
+
+### 4. Generate local development certificates
+
+The TLS reverse proxy requires a local development CA and server certificate (Phase 15B). Generate them once (idempotent):
+
+```bash
+scripts/generate_dev_certs.sh
+```
+
+To rotate/regenerate: `scripts/generate_dev_certs.sh -f`.
+
+The generated files under `proxy/certs/` are **git-ignored** and **must never be committed**. These are development-only.
+
+### 5. Trust the local CA certificate (browser/OS)
+
+Phase 15B uses local HTTPS at `https://localhost`. Your browser will not trust the development CA by default. Trust `proxy/certs/bba-ca.crt` so `https://localhost` is considered secure in your local environment.
+
+- **Chrome/Edge (Linux/macOS/Windows):** Settings → Privacy/Certificates → Import Authorities/Trusted Root → import `proxy/certs/bba-ca.crt`
+- **Firefox:** Settings → Privacy & Security → Certificates → View Certificates → Authorities → Import → select `proxy/certs/bba-ca.crt` (check “Trust this CA to identify websites”)
+- **macOS Keychain:** open `proxy/certs/bba-ca.crt` and add to “System”/“Login” keychain with “Always Trust”
+- **Ubuntu/other Linux:** depending on distro, import into system trust store (e.g., `cp proxy/certs/bba-ca.crt /usr/local/share/ca-certificates/bba-ca.crt && sudo update-ca-certificates`)
+
+After trusting, restart the browser if needed.
+
+### 6. Start the application with Docker Compose
+
+Build images and start all services (db → migrate → backend → frontend → proxy) in the background:
+
+```bash
+docker compose up -d --build
+```
+
+The proxy is the only service publishing host ports: `80`/`443`. Backend/frontend/db remain internal to the Docker network.
+
+### 7. Verify services are healthy
+
+Check container status:
+
+```bash
+docker compose ps
+```
+
+All services should reach `healthy` (or `Up` with the expected state). To inspect logs if needed:
+
+```bash
+docker compose logs -f
+# or docker compose logs -f backend | tail -50
+```
+
+Readiness endpoint (canonical): `GET https://localhost/health/ready` (or `http://localhost/health` for liveness). The backend readiness reports database state via structured JSON.
+
+### 8. Open the correct HTTPS URL
+
+Open your browser to **https://localhost**. HTTP requests are automatically redirected to HTTPS (`301`).
+
+All application routes (`/`, `/login`, `/register`, `/enrollment`, `/verification`, `/continuous`) are served via the HTTPS reverse proxy.
+
+### 9. Register / Login
+
+- Register a new account (email/password). Passwords are hashed with **Argon2id** on the server.
+- Login with those credentials. JWT access tokens are issued server-side (HS256). No passwords are ever returned by the API.
+
+### 10. Open Enrollment
+
+Navigate to **Enrollment** (`/enrollment`). You will be prompted to capture a small number of behavioral sessions (keyboard + mouse). The enrollment cap is 16 sessions.
+
+### 11. Start behavioral sessions
+
+Click **Start Session** and perform natural typing/mouse activity in the collection area. The collector records:
+
+- **Keyboard**: `keydown`/`keyup` events with high-resolution timestamps (no key characters, no typed text, no field values)
+- **Mouse**: `mousemove`/`mousedown`/`mouseup` events with viewport `x,y` and high-resolution timestamps
+
+No passwords, text content, clipboard content, or personally identifying information is read or stored.
+
+### 12. Stop sessions
+
+Click **Stop Session** to end the current collection session. A session appears in the “Sessions Ready to Submit” list with counts: `KBD … · MOUSE …`.
+
+Repeat as instructed to collect the required number of sessions.
+
+### 13. Export Sessions
+
+Click **Export Sessions** to download the collected sessions as a JSON file to your local device. **This is local-only.** The browser writes the file directly to disk; nothing is uploaded, sent over the network, or stored server-side by this action.
+
+The exported file name is e.g. `behavioral-sessions-YYYY-MM-DDTHH-MM-SS.sssZ.json` and its contents contain **only raw keyboard/mouse timing and event-type metadata** (no name, email, password, or account details).
+
+### 14. Understand “Export Sessions is local-only”
+
+- No `fetch`/XHR/`sendBeacon` call is made during export (verified by design).
+- The export uses the browser’s download mechanism only.
+- The server/database never receives the exported JSON through this button.
+
+### 15. DO NOT click “Send Sessions to Server” for Phase 16A research collection
+
+During Phase 16A research data collection, **do not click “Send … Session(s) to Server”** unless the project owner specifically instructs you to do so. For research collection, the correct workflow is to **export the JSON locally and send that exported file to the project owner**.
+
+The UI label you may see is: “Send N Session(s) to Server” (disabled until sessions exist). This is the normal enrollment submission path for the deployed application; for Phase 16A **research collection**, use **Export Sessions** instead.
+
+### 16. Share the exported JSON with the project owner
+
+After verifying the JSON downloaded successfully, send that exported JSON file to the project owner via the agreed channel. **Do not modify the file.** Keep a local copy only if instructed.
+
+---
+
+## MODEL ARTIFACTS (APPROVED, FROZEN)
+
+This repository includes the **three approved inference artifacts** required at runtime:
+
+| Artifact | Purpose | Size |
+|---|---|---|
+| `models/siamese_behavioral_encoder.pt` | Siamese encoder checkpoint (epoch 10) | ~583 KB |
+| `models/behavioral_preprocessing.json` | Train-only keyboard/mouse feature scalers | ~1.6 KB |
+| `models/verification_config.json` | Calibrated threshold `0.4635127782821655` + provenance (`dataset_synthetic.json`) | ~1.2 KB |
+
+These three files are **tracked in version control on purpose** for this research project so every participant runs the **exact same model, preprocessing artifact, and calibrated threshold**. No teammate should retrain, recalibrate, or regenerate them. They are never modified in the course of Phase 16A.
+
+- **Threshold:** `0.4635127782821655` (frozen)
+- **Checkpoint epoch:** `10` (frozen)
+- **Dataset ID:** `dataset_synthetic.json` (provenance only)
+- **Behavior:** preprocessing/scaler behavior is frozen; the system never retrains or recalibrates at runtime
+
+If any of these three files are missing, the backend returns a structured `503` (`model_load_error`, `preprocessing_artifact_error`, or `verification_config_error`) and will not serve verification/enrollment until present.
+
+Other model/checkpoint files (`*.pt`, `*.pth`, etc.) remain **git-ignored**.
+
+---
+
+## HTTPS SETUP (LOCAL DEVELOPMENT)
+
+This project uses a local HTTPS reverse proxy (Phase 15B):
+
+- **URL:** `https://localhost`
+- **HTTP → HTTPS:** all HTTP traffic on port 80 is redirected to HTTPS on port 443 (`301`)
+- **Certificates:** development-only, generated by `scripts/generate_dev_certs.sh`. The local CA is `proxy/certs/bba-ca.crt`; server cert/key in `proxy/certs/` (git-ignored).
+- **Browser trust:** import `proxy/certs/bba-ca.crt` as a trusted root/authority (see step 5). Do not skip this or you will see TLS warnings.
+- **Security:** TLS 1.2/1.3 only; HSTS enabled on HTTPS responses; `X-Content-Type-Options: nosniff`. Private keys never enter image layers and are never committed.
+- **Do not use production certificates** here — mount operator-provided certs only if deploying outside local research collection.
+
+---
+
+## DOCKER SETUP
+
+Services (from `compose.yaml`): `db` (Postgres 16-alpine, internal only), `migrate` (one-shot SQL migrations), `backend` (FastAPI), `frontend` (nginx serving built bundle), `proxy` (nginx TLS reverse proxy).
+
+Normal workflow:
+
+```bash
+docker compose up -d --build
+docker compose ps
+docker compose down
+```
+
+Notes:
+- Only `proxy` publishes `:80` and `:443` to the host. `backend` (`8000`), `frontend` (`80`), and `db` (`5432`) are not published.
+- Migrations run idempotently via the `migrate` service (`CREATE TABLE IF NOT EXISTS`).
+- Model artifacts are mounted read-only into the backend container at `/app/models`.
+- The backend healthcheck uses `/health/ready` (DB-aware). Liveness is `/health`.
+
+To reset the local database volume (destructive): `docker compose down -v`.
+
+---
+
+## PHASE 16A COLLECTION INSTRUCTIONS
+
+Participant workflow for research collection:
+
+1. **Register/Login** → create/login to your local account
+2. **Go to Enrollment** (`/enrollment`)
+3. **Start Session** → begin behavioral capture
+4. **Behave naturally** for the requested collection period (keyboard + mouse activity)
+5. **Stop Session** → end capture
+6. **Repeat** as instructed (collect the requested number of sessions)
+7. **Export Sessions** → download JSON to this device (**local-only**)
+8. **Verify** the JSON file downloaded successfully
+9. **Send the exported JSON** to the project owner (do **not** upload via the app)
+
+**Important:** DO NOT click "Send … Session(s) to Server" during Phase 16A research data collection unless the project owner specifically instructs you to do so.
+
+---
+
+## DATA COLLECTION STANDARDIZATION
+
+To ensure comparability across all participants, **all participants must use the same repository version** and must **not modify**:
+- Collector logic (`frontend/src/lib/collector.js`)
+- Session export (`frontend/src/lib/sessionExport.js`)
+- Preprocessing (`ml/preprocessing/`)
+- ML model code/weights/artifacts (`ml/`, `models/` — especially the three approved artifacts)
+- Calibrated threshold (`models/verification_config.json`)
+- Frontend collection/enrollment logic (`frontend/src/enrollment/`, `frontend/src/hooks/useCollector.js`)
+
+### Privacy Guarantees (explicit)
+
+- No passwords are collected
+- No typed text is stored
+- Actual key identities are not collected
+- Only keyboard timing/event-type metadata and mouse movement/click metadata are collected
+- Exported JSON is **not automatically uploaded** to any server
+- Participants must keep the exported JSON and send it to the project owner
+- Participants must **not** modify the dataset or ML model

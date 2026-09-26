@@ -1,0 +1,72 @@
+{
+  "artifact": "behavioral-preprocessing",
+  "artifact_version": 1,
+  "checkpoint_id": "siamese_behavioral_encoder.pt",
+  "dataset_id": "dataset_synthetic.json",
+  "dataset_schema_version": "1.0.0",
+  "feature_columns_reference": {
+    "keyboard": [
+      "hold_time",
+      "flight_time"
+    ],
+    "mouse": [
+      "dx",
+      "dy",
+      "dt",
+      "distance",
+      "speed"
+    ]
+  },
+  "fitted_on": "training partition only (seed 42, user-aware split); the scalers are reused - never refitted - for enrollment/verification probes",
+  "generated_at": "2026-09-17T15:32:42.206456+00:00",
+  "generated_by": "export_inference_artifacts.py",
+  "keyboard_scaler": {
+    "feature_columns": [
+      "hold_time",
+      "flight_time"
+    ],
+    "feature_means": [
+      71.62869205298014,
+      200.2907201986755
+    ],
+    "feature_stds": [
+      35.501035804558704,
+      198.6916459806156
+    ],
+    "method": "z-score"
+  },
+  "method": "per-feature z-score standardization (FeatureScaler)",
+  "mouse_scaler": {
+    "feature_columns": [
+      "dx",
+      "dy",
+      "dt",
+      "distance",
+      "speed"
+    ],
+    "feature_means": [
+      -0.6693072755417957,
+      0.6645820433436532,
+      26.966482972136227,
+      28.020388544891638,
+      1.1332933436532506
+    ],
+    "feature_stds": [
+      38.41971252858903,
+      38.66854159123155,
+      8.08332108789955,
+      46.766213111946584,
+      1.9794781448323713
+    ],
+    "method": "z-score"
+  },
+  "split": {
+    "dev_sessions": 10,
+    "n_users": 5,
+    "seed": 42,
+    "test_sessions": 15,
+    "train_fraction": 0.7,
+    "train_sessions": 25,
+    "val_fraction": 0.2857142857142857
+  }
+}

@@ -438,6 +438,31 @@
   margin-left:auto;
 }
 
+.enr-export{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  padding:14px;
+  border:1px solid var(--enr-border);
+  border-radius:12px;
+  background:rgba(10,18,32,0.35);
+}
+
+.enr-export-privacy{
+  margin:0;
+  color:var(--enr-faint);
+  font-size:0.8rem;
+  line-height:1.5;
+}
+
+.enr-export-notice{
+  margin:0;
+  color:var(--enr-cyan);
+  font-size:0.82rem;
+  font-weight:600;
+  overflow-wrap:anywhere;
+}
+
 .enr-spinner{
   width:16px;
   height:16px;

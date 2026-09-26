@@ -1,0 +1,35 @@
+{
+  "artifact": "verification-config",
+  "artifact_version": 1,
+  "calibration": {
+    "achieved_far": 0.05,
+    "achieved_frr": 0.0,
+    "achieved_tar": 1.0,
+    "data": "development (validation) partition only",
+    "fallback": false,
+    "target_far": 0.05,
+    "threshold": 0.4635127782821655
+  },
+  "checkpoint_epoch": 10,
+  "checkpoint_id": "siamese_behavioral_encoder.pt",
+  "dataset_id": "dataset_synthetic.json",
+  "decision_rule": {
+    "client_supplied_threshold": "not supported - always ignored",
+    "rule": "VERIFIED iff Phase 6 Euclidean L2 distance <= calibrated threshold",
+    "threshold_source": "development (validation) partition only"
+  },
+  "embedding_dim": 128,
+  "generated_at": "2026-09-17T15:32:42.206456+00:00",
+  "generated_by": "export_inference_artifacts.py",
+  "notes": "synthetic-development artifact. Regenerate the preprocessing artifact and recalibrate the threshold from real enrolment data before any real-world deployment.",
+  "preprocessing_artifact": "behavioral_preprocessing.json",
+  "preprocessing_artifact_version": 1,
+  "split": {
+    "dev_sessions": 10,
+    "n_users": 5,
+    "test_sessions": 15,
+    "train_fraction": 0.7,
+    "train_sessions": 25,
+    "val_fraction": 0.2857142857142857
+  }
+}

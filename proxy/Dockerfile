@@ -14,8 +14,16 @@
 # the host (see compose.yaml) via configurable environment variables, so the
 # same image works with the generated development certificates or an
 # operator-provided trusted certificate.
+#
+# The mount targets /etc/nginx/certs/server.crt and /etc/nginx/certs/server.key,
+# so the mount point directory must exist in the image. Docker can only
+# bind-mount a host FILE when every parent directory of the target already
+# exists; without this the container fails to start with "not a directory: Are
+# you trying to mount a directory onto a file (or vice-versa)?".
 
 FROM nginx:1.27-alpine
+
+RUN mkdir -p /etc/nginx/certs
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 

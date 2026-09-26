@@ -11,6 +11,7 @@ import {
   sessionEventCounts,
   buildEnrollmentPayload,
 } from "../lib/enrollment.js";
+import { canExportSessions, exportSessionsLocally } from "../lib/sessionExport.js";
 import EnrollmentStatus from "./components/EnrollmentStatus.jsx";
 import EnrollmentSuccess from "./components/EnrollmentSuccess.jsx";
 import SessionCapture from "./components/SessionCapture.jsx";
@@ -48,6 +49,7 @@ export default function EnrollmentPage() {
   const [submitError, setSubmitError] = useState(null);
   const [submitCode, setSubmitCode] = useState(null);
   const [result, setResult] = useState(null);
+  const [exportNotice, setExportNotice] = useState(null);
   const acceptedIds = useRef(new Set());
 
   useEffect(() => {
@@ -94,6 +96,7 @@ export default function EnrollmentPage() {
     }
     setNotice(null);
     setSubmitError(null);
+    setExportNotice(null);
     collector.start();
   }
 
@@ -101,6 +104,33 @@ export default function EnrollmentPage() {
     if (collector.status === "running") {
       collector.stop();
     }
+  }
+
+  /*
+   * Local-only export. Everything happens in this browser tab: the sessions
+   * already held in page state are serialized to JSON and handed to the
+   * browser's own download mechanism. Nothing is sent to FastAPI, nothing is
+   * written to PostgreSQL, and no external service is contacted.
+   */
+  function handleExport() {
+    const outcome = exportSessionsLocally(sessions);
+    if (!outcome.ok) {
+      setExportNotice(
+        outcome.reason === "no-sessions"
+          ? "There are no sessions to export yet. Record a session first, then export."
+          : "This browser could not start the download. Check that downloads are allowed for this page, then try again."
+      );
+      return;
+    }
+    setExportNotice(
+      "Exported " +
+        outcome.session_count +
+        " session" +
+        (outcome.session_count === 1 ? "" : "s") +
+        " to " +
+        outcome.filename +
+        ". The file stays on this device — the raw behavioral data was not uploaded."
+    );
   }
 
   async function handleSubmit() {
@@ -136,6 +166,7 @@ export default function EnrollmentPage() {
     setPhase("collect");
     setSubmitError(null);
     setSubmitCode(null);
+    setExportNotice(null);
     setSessions([]);
     setResult(null);
   }
@@ -204,6 +235,34 @@ export default function EnrollmentPage() {
                         </li>
                       ))}
                     </ol>
+                  )}
+                </div>
+
+                <div className="enr-export">
+                  <button
+                    type="button"
+                    className="enr-btn enr-btn-secondary enr-btn-block"
+                    disabled={!canExportSessions(sessions.length)}
+                    onClick={handleExport}
+                  >
+                    {canExportSessions(sessions.length)
+                      ? "Export Sessions (" +
+                        sessions.length +
+                        ") — download JSON to this device"
+                      : "Export Sessions (disabled — no sessions to export)"}
+                  </button>
+                  <p className="enr-export-privacy">
+                    Download only. The exported JSON is written straight to your
+                    device by your browser. It is never uploaded to the server, never
+                    stored in the database, and never sent to any third party. The
+                    file name and its contents contain no name, email, password, or
+                    other account details — only the raw keyboard/mouse timing data
+                    you just recorded.
+                  </p>
+                  {exportNotice && (
+                    <p className="enr-export-notice" role="status">
+                      {exportNotice}
+                    </p>
                   )}
                 </div>
 
