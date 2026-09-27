@@ -10,9 +10,11 @@
 #     dataset.*          (schema/loaders)
 #     baseline.*         (baseline evaluators)
 #
-# Model artifacts are intentionally NOT baked into the image. They are
-# gitignored and runtime-mounted read-only (./models:/app/models:ro), so the
-# existing local artifacts are used without being committed.
+# The approved ML artifacts are intentionally NOT baked into the image. The
+# three frozen artifacts (models/siamese_behavioral_encoder.pt,
+# models/behavioral_preprocessing.json, models/verification_config.json) are
+# tracked in Git (Phase 16B) and are mounted read-only at runtime
+# (./models:/app/models:ro). They are never retrained or regenerated.
 #
 # .env is never copied into the image. All configuration (PostgreSQL URL, JWT
 # secret, CORS, artifact paths) arrives via BBA_* environment variables, which

@@ -466,6 +466,147 @@ To reset the local database volume (destructive): `docker compose down -v`.
 
 ---
 
+## Oracle Cloud Production Deployment
+
+> **Preparation status.** This section documents the intended production deployment. No Oracle VM, deployment, or certificate has been created by the D2 configuration-preparation phase. Everything below is written for an operator who has been explicitly authorized to provision and deploy.
+
+The same `compose.yaml` used for local testing is used for production. The **only** difference is the values in the VM's git-ignored `.env` — there is no separate production compose file, and none is needed. Local development is unaffected because `compose.yaml` pins `BBA_ENVIRONMENT=production` for the container itself.
+
+### 1. Target architecture
+
+```
+Oracle Cloud Ubuntu VM
+  └─> Docker Compose
+        └─> Nginx (proxy — the ONLY service publishing host ports :80 / :443)
+              ├─> Frontend (React/Vite bundle, served by nginx)
+              └─> FastAPI (backend, internal :8000)
+                    ├─> PostgreSQL 16 (internal :5432, named volume)
+                    └─> ML inference (frozen artifacts, read-only mount)
+```
+
+The proxy terminates TLS and is the single public edge. The browser and the API share one same-origin path, so `VITE_API_BASE_URL` stays the relative `/api/v1`.
+
+### 2. Recommended VM
+
+- **Oracle Ampere A1, minimum 4 GB RAM.**
+- The 1 GB AMD micro is **too small**: the backend image build needs roughly 1.5–2 GB RAM for the CPU PyTorch install. Steady-state usage is far lower (~500–650 MB), but the build peak is what constrains the shape.
+- Boot volume: the default 50 GB is ample (~10–15 GB used).
+
+### 3. Network
+
+| Port | Access | Reason |
+|---|---|---|
+| TCP 443 | Public ingress | HTTPS (the proxy) |
+| TCP 80 | Public ingress | HTTP → HTTPS redirect only |
+| SSH | **Restrict to the administrator's IP** where possible | Administration |
+
+Only the `proxy` publishes host ports. PostgreSQL, the backend, and the frontend are reachable solely on the internal Compose network and must **not** be given public ingress rules.
+
+### 4. Repository setup
+
+```bash
+git clone https://github.com/Himanshu-Trivedi9026/behavioral-biometric-authentication.git
+cd behavioral-biometric-authentication
+```
+
+### 5. Verify model artifacts
+
+```bash
+sha256sum models/siamese_behavioral_encoder.pt \
+  models/behavioral_preprocessing.json \
+  models/verification_config.json
+```
+
+Expected:
+
+```
+bbaec09299598fd715f9a66a9fea7ffc4bf416dae5f4db3d76704b919ca156b1  models/siamese_behavioral_encoder.pt
+3085a7f0a4c6810c10f90a9c18eab44673132678aa8d71cf95049f18a5f343b1  models/behavioral_preprocessing.json
+0221a34d34bfe6057a7bb2978fb09b0ef288aa12533e43179beed0bee16e279e  models/verification_config.json
+```
+
+All three values are also recorded in `.env.example`. `git clone` already delivers the files; a mismatch means the clone is not at the expected commit — stop and investigate before deploying.
+
+These three artifacts are **already tracked in Git** and are **frozen**. Do **not** retrain, recalibrate, re-export, regenerate, or manually copy them onto the VM. `compose.yaml` mounts `./models` read-only at `/app/models`.
+
+### 6. Environment
+
+```bash
+cp .env.example .env
+```
+
+Generate the two secrets **on the VM** (never paste the output into Git):
+
+```bash
+python3 -c "import secrets;print(secrets.token_urlsafe(48))"   # -> BBA_JWT_SECRET_KEY
+python3 -c "import secrets;print(secrets.token_hex(32))"       # -> POSTGRES_PASSWORD
+```
+
+Then set these in `.env`:
+
+```
+BBA_CORS_ORIGINS=https://<PUBLIC_ORIGIN>
+VITE_API_BASE_URL=/api/v1
+```
+
+`BBA_CORS_ORIGINS` must be the exact origin the browser uses, with no trailing slash and no path. Keep `VITE_API_BASE_URL` as the relative `/api/v1`.
+
+```bash
+chmod 600 .env
+```
+
+### 7. Preflight
+
+```bash
+docker compose config --quiet
+```
+
+This **fails with a non-zero exit** while any required secret is missing. That is intentional fail-closed behavior — do not work around it. The command does not print secret values.
+
+### 8. Deployment
+
+```bash
+docker compose up -d --build
+```
+
+### 9. Verify
+
+```bash
+docker compose ps
+docker compose logs migrate
+```
+
+`db`, `backend`, `frontend`, and `proxy` should all report **healthy**; `migrate` is a one-shot service that should exit `0` after applying `001`–`003` idempotently.
+
+### 10. Current TLS limitation
+
+- The certificates in `proxy/certs/` are **development certificates for localhost** (`CN=localhost`, SAN `DNS:localhost, IP:127.0.0.1`) produced by `scripts/generate_dev_certs.sh`.
+- They are **not trusted by browsers and must NOT be used as trusted production certificates** for a real public hostname. Browsers will show a TLS warning.
+- A trusted public certificate **cannot be issued for a bare VM IP address** — do not plan around that.
+- A later domain/TLS phase replaces them with a trusted certificate by overriding `BBA_TLS_CERT_PATH` / `BBA_TLS_KEY_PATH` in `.env`. No compose, Dockerfile, nginx, or code change is required for that swap. Private keys are never committed (`.gitignore` excludes `*.key`, `*.pem`, `*.crt`).
+
+### 11. Backup
+
+PostgreSQL data lives in the named volume `postgres_data`, which is the **only** copy of all accounts and enrollment profiles. Schedule a dump and keep it off the VM:
+
+```bash
+docker compose exec -T db pg_dump -U bba -d behavioral | gzip > ~/bba-$(date +%F).sql.gz
+```
+
+`docker compose down -v` **destroys** this data. A VM reprovision loses it too.
+
+### 12. Phase 16A protection (unchanged by deployment)
+
+**Deploying this stack does not change the Phase 16A workflow in any way.** Specifically:
+
+- Raw behavioral sessions are still **exported locally** in the browser and shared with the project owner out-of-band. Nothing is uploaded automatically.
+- Deployment adds **no** upload endpoint and **no** automatic submission path. There is no `multipart`/`UploadFile` handler anywhere in the backend.
+- The collector, the session export, the event schema, and the real-data dataset pipeline are all unchanged.
+- The rule in step 15 above — **“DO NOT click ‘Send Sessions to Server’ for Phase 16A research collection”** — applies exactly as it does locally. Read [14. Understand “Export Sessions is local-only”](#14-understand-export-sessions-is-local-only) and [PHASE 16A COLLECTION INSTRUCTIONS](#phase-16a-collection-instructions) before collecting any data.
+- The frozen ML artifacts and the calibrated threshold are identical for every participant, whether they run locally or against the deployed instance.
+
+---
+
 ## PHASE 16A COLLECTION INSTRUCTIONS
 
 Participant workflow for research collection:
